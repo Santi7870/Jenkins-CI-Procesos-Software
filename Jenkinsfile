@@ -30,7 +30,7 @@ pipeline {
                         dir('principal') {
                             checkout scm
                             catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                                powershell '-NoProfile -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -Suite CalculadoraTest'
+                                bat 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\run-tests.ps1 -Suite CalculadoraTest'
                             }
                         }
                     }
@@ -43,7 +43,7 @@ pipeline {
                         dir('adicional') {
                             checkout scm
                             catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                                powershell '-NoProfile -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -Suite CasosAdicionalesTest'
+                                bat 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\run-tests.ps1 -Suite CasosAdicionalesTest'
                             }
                         }
                     }
@@ -65,7 +65,7 @@ pipeline {
                     string(credentialsId: 'telegram-bot-token', variable: 'TG_TOKEN'),
                     string(credentialsId: 'telegram-chat-id', variable: 'TG_CHAT_ID')
                 ]) {
-                    powershell '-NoProfile -ExecutionPolicy Bypass -File scripts/send-telegram.ps1'
+                    bat 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\send-telegram.ps1'
                 }
             }
         }
