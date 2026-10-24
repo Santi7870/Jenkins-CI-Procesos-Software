@@ -24,16 +24,19 @@ La biblioteca Groovy `vars/ciTasks.groovy` comparte funciones de instalación, e
 ## Configuración en Jenkins Windows
 Crear tres trabajos tipo **Pipeline**, cada uno con **Pipeline script from SCM**, Git, URL `https://github.com/Santi7870/Jenkins-CI-Procesos-Software.git`, credencial GitHub configurada en cada trabajo, rama de script `*/main` y el respectivo **Script Path** de la tabla anterior.
 
-En el trabajo principal usar **Build with Parameters**, con `GIT_REF` igual a `main`, `develop` o `feature/interfaz-tareas`. El principal transmite el parámetro a los dos trabajos hijos. Los archivos Jenkinsfile se cargan desde main, mientras el código validado se descarga desde la rama indicada.
+En el trabajo principal usar **Build with Parameters** y elegir `main`, `develop` o `feature/interfaz-tareas` en `GIT_REF`. El principal transmite la selección a los dos trabajos hijos. Los archivos Jenkinsfile se cargan desde main, mientras el código validado se descarga desde la rama indicada.
 
 Antes de ejecutar los hijos, definir en **Manage Jenkins > System > Global properties > Environment variables** las variables `GIT_REPOSITORY_URL` (URL HTTPS o SSH del repositorio) y `GIT_CREDENTIALS_ID` (ID de la credencial configurada en Jenkins). Los dos Jenkinsfiles secundarios leen esas variables; no contienen URL ni ID de credenciales del repositorio en su código. El repositorio de los propios Jenkinsfiles se configura por SCM en la interfaz de cada trabajo.
 
 Configurar en Jenkins:
-- Plugin **NodeJS** y herramienta `NodeJS22` en Manage Jenkins > Tools.
-- Plugin **SonarQube Scanner for Jenkins**, servidor `SonarQube-UDLA` en Manage Jenkins > System y escáner `SonarScanner` en Tools.
+- Plugins **Pipeline**, **Git**, **Credentials Binding**, **NodeJS**, **PowerShell** y **SonarQube Scanner for Jenkins**.
+- Registrar la herramienta NodeJS `NodeJS22` en Manage Jenkins > Tools. Los agentes que ejecutan los pipelines deben ser Windows, ya que los Jenkinsfiles usan `bat`.
+- Registrar el servidor `SonarQube-UDLA` en Manage Jenkins > System con su credencial de token, y el escáner `SonarScanner` en Tools.
 - Una **Global Pipeline Library** llamada `taskflow-lib`, obtenida de este repositorio privado en la versión `main`. Usa `vars/ciTasks.groovy`.
 - Credenciales `telegram-bot-token` y `telegram-chat-id`.
-- En el equipo agente, `npx playwright install chromium`. SonarQube necesita un servidor en ejecución accesible desde Jenkins.
+- SonarQube necesita un servidor en ejecución accesible desde Jenkins. Chromium se instala en el agente al ejecutar la etapa E2E de `main`.
+
+El archivo `jenkins-home.zip` entregado corresponde a otro entorno: contiene el trabajo histórico `Pipeline-CI-Procesos-Software` (Java/Maven), no los tres trabajos TaskFlow. Su única ejecución registrada (#1) terminó correctamente, pero eso no valida estos pipelines. No restaures ese `JENKINS_HOME` encima de una instalación existente para configurar TaskFlow; crea los tres trabajos indicados y conserva el ZIP cifrado porque contiene credenciales y claves.
 
 ## Cuatro estrategias de optimización
 1. **Paralela:** el principal activa los pipelines secundarios de pruebas y calidad simultáneamente.

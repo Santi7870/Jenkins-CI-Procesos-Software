@@ -2,7 +2,9 @@
 pipeline {
   agent none
   options { timestamps(); disableConcurrentBuilds() }
-  parameters { string(name: 'GIT_REF', defaultValue: 'main', description: 'Rama de la aplicación') }
+  parameters {
+    choice(name: 'GIT_REF', choices: ['main', 'develop', 'feature/interfaz-tareas'], description: 'Rama de la aplicación')
+  }
   stages {
     stage('Seleccionar rama') {
       agent any
@@ -25,7 +27,7 @@ pipeline {
   }
   post {
     always { script { echo 'Duración: ' + currentBuild.durationString + ' | Estado: ' + currentBuild.currentResult } }
-    success { script { ciTasks.notifyTelegram('SUCCESS') } }
-    failure { script { ciTasks.notifyTelegram('FAILURE') } }
+    success { node { script { ciTasks.notifyTelegram('SUCCESS') } } }
+    failure { node { script { ciTasks.notifyTelegram('FAILURE') } } }
   }
 }

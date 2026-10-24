@@ -3,7 +3,9 @@ pipeline {
   agent any
   tools { nodejs 'NodeJS22' }
   options { timestamps(); skipDefaultCheckout(true); disableConcurrentBuilds() }
-  parameters { string(name: 'GIT_REF', defaultValue: 'main', description: 'Rama de la aplicación') }
+  parameters {
+    choice(name: 'GIT_REF', choices: ['main', 'develop', 'feature/interfaz-tareas'], description: 'Rama de la aplicación')
+  }
   stages {
     stage('Checkout') {
       steps {
