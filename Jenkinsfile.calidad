@@ -1,0 +1,41 @@
+@Library('taskflow-lib@main') _
+pipeline {
+  agent any
+  tools { nodejs 'NodeJS22' }
+  options { timestamps(); skipDefaultCheckout(true); disableConcurrentBuilds() }
+  parameters { string(name: 'GIT_REF', defaultValue: 'main', description: 'Rama de la aplicación') }
+  stages {
+    stage('Checkout') {
+      steps {
+        git branch: params.GIT_REF, credentialsId: 'github-jenkins-ci', url: 'https://github.com/Santi7870/Jenkins-CI-Procesos-Software.git'
+      }
+    }
+    stage('ESLint') {
+      steps { script { ciTasks.run('npm run lint', env.JENKINS_HOME + '\\npm-taskflow-cache') } }
+    }
+    stage('Build') {
+      when { expression { params.GIT_REF == 'develop' || params.GIT_REF == 'main' } }
+      steps { bat 'npm run build' }
+    }
+    stage('SonarQube') {
+      when { expression { params.GIT_REF == 'develop' || params.GIT_REF == 'main' } }
+      steps {
+        script {
+          bat 'npm run test:coverage'
+          def scannerHome = tool 'SonarScanner'
+          withSonarQubeEnv('SonarQube-UDLA') {
+            bat '"' + scannerHome + '\\bin\\sonar-scanner.bat"'
+          }
+        }
+      }
+    }
+  }
+  post {
+    always {
+      script { echo 'Duración calidad: ' + currentBuild.durationString }
+      archiveArtifacts artifacts: 'dist/**', allowEmptyArchive: true
+    }
+    success { echo 'Calidad correcta' }
+    failure { echo 'Calidad fallida' }
+  }
+}
