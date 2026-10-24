@@ -1,41 +1,45 @@
 # TaskFlow — Procesos de Software
 
-Aplicación web funcional: crear, editar, eliminar y buscar tareas, priorizarlas, cambiar estados y guardar datos en el navegador.
+Aplicación web de tareas: crear, editar, buscar, priorizar, eliminar y cambiar el estado de actividades, con persistencia local.
 
-## Ejecutar
+## Ejecutar localmente
+Instalar Node.js 22. Ejecutar `npm install` y `npm run dev`. Abrir la URL indicada por Vite.
 
-Node.js 22. Ejecutar `npm install` y `npm run dev`. Para CI, la biblioteca utiliza `npm install` con caché persistente porque todavía no se ha generado un archivo `package-lock.json` verificado. Abrir la dirección que muestra Vite.
+## Pruebas definidas
+- 12 pruebas unitarias: `npm run test:unit`
+- 8 pruebas de integración: `npm run test:integration`
+- 4 pruebas E2E: instalar Chromium con `npx playwright install chromium` y ejecutar `npm run test:e2e`
 
-## Pruebas: 24 casos definidos
+## Modularización: tres trabajos Jenkins
+El archivo raíz `Jenkinsfile` es el orquestador. Invoca mediante `build job:` dos trabajos independientes **en paralelo**, espera a que terminen y propaga sus resultados:
 
-- 12 unitarias: `npm run test:unit`
-- 8 integración: `npm run test:integration`
-- 4 E2E Playwright: `npx playwright install chromium` y `npm run test:e2e`
+| Trabajo | Archivo de definición | Responsabilidad |
+| --- | --- | --- |
+| TaskFlow-Principal | `Jenkinsfile` | Llamar a los pipelines secundarios y notificar a Telegram |
+| TaskFlow-Pruebas | `Jenkinsfile.pruebas` | Unitarias, integración y E2E según rama |
+| TaskFlow-Calidad | `Jenkinsfile.calidad` | ESLint, build y SonarQube según rama |
 
-## Ramas
+La biblioteca Groovy `vars/ciTasks.groovy` comparte funciones de instalación, ejecución y notificación.
 
-- `feature/*`: ESLint y unitarias en paralelo.
-- `develop`: añade integración, build y análisis SonarQube.
-- `main`: añade pruebas E2E y archiva `dist/`.
+## Configuración en Jenkins Windows
+Crear tres trabajos tipo **Pipeline**, cada uno con **Pipeline script from SCM**, Git, URL `https://github.com/Santi7870/Jenkins-CI-Procesos-Software.git`, credencial `github-jenkins-ci`, rama de script `*/main` y el respectivo **Script Path** de la tabla anterior.
 
-## Optimización
+En el trabajo principal usar **Build with Parameters**, con `GIT_REF` igual a `main`, `develop` o `feature/interfaz-tareas`. El principal transmite el parámetro a los dos trabajos hijos. Los archivos Jenkinsfile se cargan desde main, mientras el código validado se descarga desde la rama indicada.
 
-- Paralelo: ESLint y pruebas unitarias independientes.
-- Caché: `npm ci --cache` con caché persistente en Jenkins.
-- Selectivo: etapas activadas según `BRANCH_NAME` mediante `when`.
-- Biblioteca compartida: `vars/ciTasks.groovy`, importada mediante `@Library('taskflow-lib@main')`.
+Configurar en Jenkins:
+- Plugin **NodeJS** y herramienta `NodeJS22` en Manage Jenkins > Tools.
+- Plugin **SonarQube Scanner for Jenkins**, servidor `SonarQube-UDLA` en Manage Jenkins > System y escáner `SonarScanner` en Tools.
+- Una **Global Pipeline Library** llamada `taskflow-lib`, obtenida de este repositorio privado en la versión `main`. Usa `vars/ciTasks.groovy`.
+- Credenciales `telegram-bot-token` y `telegram-chat-id`.
+- En el equipo agente, `npx playwright install chromium`. SonarQube necesita un servidor en ejecución accesible desde Jenkins.
 
-## Jenkins Windows — configuración manual necesaria
+## Cuatro estrategias de optimización
+1. **Paralela:** el principal activa los pipelines secundarios de pruebas y calidad simultáneamente.
+2. **Caché:** la biblioteca utiliza una carpeta persistente para dependencias npm.
+3. **Selectiva por rama:** feature ejecuta unitarias y ESLint; develop agrega integración, build y SonarQube; main agrega las E2E.
+4. **Modular:** un pipeline principal invoca otros dos mediante `build job:`, cada uno con su propio Jenkinsfile; además se reutiliza Groovy.
 
-Crear **Multibranch Pipeline** GitHub con credenciales del repositorio privado.
-En Manage Jenkins > Tools instalar/configurar NodeJS con nombre **NodeJS22** (plugin NodeJS).
-En Manage Jenkins > System configurar **Global Pipeline Library**, nombre **taskflow-lib**, fuente Git SCM que apunte a este mismo repositorio, versión por defecto **main**, y permitir la versión solicitada.
-Instalar plugin **SonarQube Scanner for Jenkins**; en System registrar servidor **SonarQube-UDLA** con credenciales; en Tools configurar SonarScanner CLI como **SonarScanner**.
-Configurar secretos `telegram-bot-token` y `telegram-chat-id`.
-En el agente Windows instalar navegador E2E: `npx playwright install chromium`.
-SonarQube necesita un servidor accesible desde Jenkins. El Quality Gate aún no está configurado como bloqueo.
-El pipeline archiva la carpeta `dist/` para la entrega; no despliega a hosting externo. Para comparación de rendimiento, observar duración de etapas en Jenkins y registrar al menos tres ejecuciones con caché fría y caliente.
+## Métricas y alcance
+Los trabajos permiten medir duración total y por pipeline. Comparar ejecuciones equivalentes de la misma rama, incluyendo caché fría y caliente. Los resultados de la versión nueva **no están verificados todavía en Jenkins**. El build genera `dist/`, pero no existe un despliegue automático a hosting. El Quality Gate de SonarQube no está configurado como bloqueo.
 
-## Medición
-
-Jenkins publica tiempos de ejecución; realizar al menos tres ejecuciones comparables para medir tiempos y observar el efecto de caché. La ejecución de esta nueva versión en Jenkins está pendiente.
+Las credenciales y tokens deben mantenerse dentro de Jenkins, nunca dentro del repositorio.
