@@ -1,0 +1,1 @@
+import {defineConfig} from 'vite';export default defineConfig({test:{environment:'node',include:['tests/unit/**/*.test.js','tests/integration/**/*.test.js'],reporters:['default','junit'],outputFile:{junit:'reports/vitest.xml'},coverage:{reporter:['text','lcov'],include:['src/tasks.js','src/storage.js']}}});
