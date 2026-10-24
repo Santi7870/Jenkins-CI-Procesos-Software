@@ -2,62 +2,81 @@ pipeline {
     agent any
 
     tools {
-        // Configurar Maven3 en Manage Jenkins > Tools.
         maven 'Maven3'
     }
 
     options {
         skipDefaultCheckout(true)
         timestamps()
+        disableConcurrentBuilds()
     }
 
     stages {
         stage('1 - Repositorio privado') {
             steps {
-                // Usa el repositorio y las credenciales del trabajo Jenkins.
                 checkout scm
+                script {
+                    def rama = (env.GIT_BRANCH ?: 'main').replaceFirst(/^origin\//, '')
+                    env.RUN_EXTENDED = (rama == 'main') ? 'true' : 'false'
+                    echo "Rama: ${rama}"
+                }
             }
         }
 
         stage('2 - Compilacion y tests') {
-            steps {
-                // Permite pasar a la notificacion aunque fallen las pruebas.
-                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                    bat 'mvn -B clean test'
+            parallel {
+                stage('Pruebas principales') {
+                    steps {
+                        dir('principal') {
+                            checkout scm
+                            catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                                powershell '-NoProfile -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -Suite CalculadoraTest'
+                            }
+                        }
+                    }
+                }
+                stage('Pruebas adicionales') {
+                    when {
+                        expression { env.RUN_EXTENDED == 'true' }
+                    }
+                    steps {
+                        dir('adicional') {
+                            checkout scm
+                            catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                                powershell '-NoProfile -ExecutionPolicy Bypass -File scripts/run-tests.ps1 -Suite CasosAdicionalesTest'
+                            }
+                        }
+                    }
                 }
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
+                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
                 }
             }
         }
 
         stage('3 - Notificacion Telegram') {
             steps {
-                script { env.BUILD_STATUS = currentBuild.currentResult }
+                script {
+                    env.BUILD_STATUS = currentBuild.currentResult
+                }
                 withCredentials([
                     string(credentialsId: 'telegram-bot-token', variable: 'TG_TOKEN'),
                     string(credentialsId: 'telegram-chat-id', variable: 'TG_CHAT_ID')
                 ]) {
-                    // No muestra las credenciales en los logs.
-                    powershell '''
-                        $estado = $env:BUILD_STATUS
-                        if (-not $estado) { $estado = "DESCONOCIDO" }
-                        $mensaje = "Jenkins CI - $estado | $env:JOB_NAME #$env:BUILD_NUMBER"
-                        $uri = "https://api.telegram.org/bot$env:TG_TOKEN/sendMessage"
-                        Invoke-RestMethod -Method Post -Uri $uri -Body @{
-                            chat_id = $env:TG_CHAT_ID
-                            text = $mensaje
-                        } | Out-Null
-                    '''
+                    powershell '-NoProfile -ExecutionPolicy Bypass -File scripts/send-telegram.ps1'
                 }
             }
         }
     }
 
     post {
-        success { echo 'Pipeline finalizado correctamente.' }
-        failure { echo 'Revisar el log y los resultados de las pruebas.' }
+        success {
+            echo 'Pipeline finalizado correctamente.'
+        }
+        failure {
+            echo 'Revisar el registro y los resultados de las pruebas.'
+        }
     }
 }
