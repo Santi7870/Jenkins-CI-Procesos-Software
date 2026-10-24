@@ -4,7 +4,7 @@ Aplicación web funcional: crear, editar, eliminar y buscar tareas, priorizarlas
 
 ## Ejecutar
 
-Node.js 22. Ejecutar `npm install` y `npm run dev`. Abrir la dirección que muestra Vite.
+Node.js 22. Ejecutar `npm install` y `npm run dev`. Para CI, la biblioteca utiliza `npm install` con caché persistente porque todavía no se ha generado un archivo `package-lock.json` verificado. Abrir la dirección que muestra Vite.
 
 ## Pruebas: 24 casos definidos
 
@@ -34,7 +34,7 @@ Instalar plugin **SonarQube Scanner for Jenkins**; en System registrar servidor 
 Configurar secretos `telegram-bot-token` y `telegram-chat-id`.
 En el agente Windows instalar navegador E2E: `npx playwright install chromium`.
 SonarQube necesita un servidor accesible desde Jenkins. El Quality Gate aún no está configurado como bloqueo.
-El pipeline archiva la carpeta `dist/` para la entrega; no despliega a hosting externo.
+El pipeline archiva la carpeta `dist/` para la entrega; no despliega a hosting externo. Para comparación de rendimiento, observar duración de etapas en Jenkins y registrar al menos tres ejecuciones con caché fría y caliente.
 
 ## Medición
 
