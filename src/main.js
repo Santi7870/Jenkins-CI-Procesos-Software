@@ -1,0 +1,15 @@
+import './style.css';
+import {createTask,updateTask,deleteTask,filterTasks,stats,STATUSES} from './tasks.js';
+import {loadTasks,saveTasks} from './storage.js';
+let tasks=loadTasks(localStorage),search='',status='todas';
+const root=document.querySelector('#app');
+root.innerHTML='<section class="shell"><header><small>PROCESOS DE SOFTWARE · CI/CD</small><h1>TaskFlow</h1><p>Gestión de tareas</p></header><div id="metrics" class="metrics"></div><form id="new-task"><input id="title" aria-label="Nueva tarea" placeholder="Nueva tarea" required maxlength="100"/><select id="priority" aria-label="Prioridad"><option value="media">Media</option><option value="alta">Alta</option><option value="baja">Baja</option></select><button>Agregar</button></form><div class="filters"><input id="search" aria-label="Buscar tareas" placeholder="Buscar tareas"/><select id="filter" aria-label="Filtrar estado"><option value="todas">Todas</option><option value="pendiente">Pendientes</option><option value="en progreso">En progreso</option><option value="completada">Completadas</option></select></div><ul id="tasks"></ul><p id="empty" hidden>Sin resultados</p></section>';
+const esc=v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+function render(){const m=stats(tasks);document.querySelector('#metrics').textContent='Total: '+m.total+' | Pendientes: '+m.pending+' | Completadas: '+m.completed;const filtered=filterTasks(tasks,{search,status});document.querySelector('#empty').hidden=filtered.length>0;document.querySelector('#tasks').innerHTML=filtered.map(t=>'<li data-id="'+esc(t.id)+'"><strong>'+esc(t.title)+'</strong><small>Prioridad: '+esc(t.priority)+'</small><select class="state" aria-label="Estado de '+esc(t.title)+'">'+STATUSES.map(s=>'<option value="'+s+'" '+(s===t.status?'selected':'')+'>'+s+'</option>').join('')+'</select><button class="edit">Editar</button><button class="remove">Eliminar</button></li>').join('');}
+function commit(next){tasks=next;saveTasks(localStorage,tasks);render();}
+document.querySelector('#new-task').addEventListener('submit',e=>{e.preventDefault();try{commit([...tasks,createTask(document.querySelector('#title').value,document.querySelector('#priority').value)]);document.querySelector('#title').value='';}catch(err){alert(err.message);}});
+document.querySelector('#search').addEventListener('input',e=>{search=e.target.value;render();});
+document.querySelector('#filter').addEventListener('change',e=>{status=e.target.value;render();});
+document.querySelector('#tasks').addEventListener('change',e=>{if(e.target.matches('.state'))commit(updateTask(tasks,e.target.closest('li').dataset.id,{status:e.target.value}));});
+document.querySelector('#tasks').addEventListener('click',e=>{const li=e.target.closest('li');if(!li)return;const id=li.dataset.id;if(e.target.matches('.remove'))commit(deleteTask(tasks,id));if(e.target.matches('.edit')){const text=prompt('Editar tarea',tasks.find(t=>t.id===id).title);if(text!==null){try{commit(updateTask(tasks,id,{title:text}));}catch(err){alert(err.message);}}}});
+render();
