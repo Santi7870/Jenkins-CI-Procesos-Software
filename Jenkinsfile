@@ -1,82 +1,46 @@
+@Library('taskflow-lib@main') _
 pipeline {
-    agent any
-
-    tools {
-        maven 'Maven3'
+ agent any
+ tools { nodejs 'NodeJS22' }
+ options { skipDefaultCheckout(true); timestamps(); disableConcurrentBuilds() }
+ stages {
+  stage('Checkout') { steps { checkout scm } }
+  stage('Validaciones paralelas') {
+   parallel {
+    stage('ESLint') {
+     steps { dir('lint-workspace') { checkout scm; script { ciTasks.run('npm run lint', env.JENKINS_HOME + '\\npm-taskflow-cache') } } }
     }
-
-    options {
-        skipDefaultCheckout(true)
-        timestamps()
-        disableConcurrentBuilds()
+    stage('Unitarias') {
+     steps { dir('unit-workspace') { checkout scm; script { ciTasks.run('npm run test:unit', env.JENKINS_HOME + '\\npm-taskflow-cache') } } }
+     post { always { junit allowEmptyResults:true, testResults:'unit-workspace/reports/vitest.xml' } }
     }
-
-    stages {
-        stage('1 - Repositorio privado') {
-            steps {
-                checkout scm
-                script {
-                    def rama = (env.GIT_BRANCH ?: 'main').replaceFirst(/^origin\//, '')
-                    env.RUN_EXTENDED = (rama == 'main') ? 'true' : 'false'
-                    echo "Rama: ${rama}"
-                }
-            }
-        }
-
-        stage('2 - Compilacion y tests') {
-            parallel {
-                stage('Pruebas principales') {
-                    steps {
-                        dir('principal') {
-                            checkout scm
-                            catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                                bat 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\run-tests.ps1 -Suite CalculadoraTest'
-                            }
-                        }
-                    }
-                }
-                stage('Pruebas adicionales') {
-                    when {
-                        expression { env.RUN_EXTENDED == 'true' }
-                    }
-                    steps {
-                        dir('adicional') {
-                            checkout scm
-                            catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                                bat 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\run-tests.ps1 -Suite CasosAdicionalesTest'
-                            }
-                        }
-                    }
-                }
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
-                }
-            }
-        }
-
-        stage('3 - Notificacion Telegram') {
-            steps {
-                script {
-                    env.BUILD_STATUS = currentBuild.currentResult
-                }
-                withCredentials([
-                    string(credentialsId: 'telegram-bot-token', variable: 'TG_TOKEN'),
-                    string(credentialsId: 'telegram-chat-id', variable: 'TG_CHAT_ID')
-                ]) {
-                    bat 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\\send-telegram.ps1'
-                }
-            }
-        }
+   }
+  }
+  stage('Integración y build') {
+   when { anyOf { branch 'develop'; branch 'main' } }
+   steps { script { ciTasks.run('npm run test:integration', env.JENKINS_HOME + '\\npm-taskflow-cache') }; bat 'npm run build' }
+   post { always { junit allowEmptyResults:true, testResults:'reports/vitest.xml' } }
+  }
+  stage('SonarQube') {
+   when { anyOf { branch 'develop'; branch 'main' } }
+   steps {
+    script {
+     ciTasks.install(env.JENKINS_HOME + '\\npm-taskflow-cache')
+     bat 'npm run test:coverage'
+     def scannerHome = tool 'SonarScanner'
+     withSonarQubeEnv('SonarQube-UDLA') { bat '"' + scannerHome + '\\bin\\sonar-scanner.bat"' }
     }
-
-    post {
-        success {
-            echo 'Pipeline finalizado correctamente.'
-        }
-        failure {
-            echo 'Revisar el registro y los resultados de las pruebas.'
-        }
-    }
+   }
+  }
+  stage('E2E y entrega') {
+   when { branch 'main' }
+   steps { bat 'npx playwright test'; archiveArtifacts artifacts:'dist/**', allowEmptyArchive:false }
+   post { always { junit allowEmptyResults:true, testResults:'reports/playwright.xml' } }
+  }
+ }
+ post {
+  always { script { echo 'Duración: ' + currentBuild.durationString + ' | Estado: ' + currentBuild.currentResult } }
+  success { script { ciTasks.notifyTelegram('SUCCESS') } }
+  failure { script { ciTasks.notifyTelegram('FAILURE') } }
+ }
 }
