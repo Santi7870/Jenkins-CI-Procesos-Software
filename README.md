@@ -22,9 +22,11 @@ El archivo raíz `Jenkinsfile` es el orquestador. Invoca mediante `build job:` d
 La biblioteca Groovy `vars/ciTasks.groovy` comparte funciones de instalación, ejecución y notificación.
 
 ## Configuración en Jenkins Windows
-Crear tres trabajos tipo **Pipeline**, cada uno con **Pipeline script from SCM**, Git, URL `https://github.com/Santi7870/Jenkins-CI-Procesos-Software.git`, credencial `github-jenkins-ci`, rama de script `*/main` y el respectivo **Script Path** de la tabla anterior.
+Crear tres trabajos tipo **Pipeline**, cada uno con **Pipeline script from SCM**, Git, URL `https://github.com/Santi7870/Jenkins-CI-Procesos-Software.git`, credencial GitHub configurada en cada trabajo, rama de script `*/main` y el respectivo **Script Path** de la tabla anterior.
 
 En el trabajo principal usar **Build with Parameters**, con `GIT_REF` igual a `main`, `develop` o `feature/interfaz-tareas`. El principal transmite el parámetro a los dos trabajos hijos. Los archivos Jenkinsfile se cargan desde main, mientras el código validado se descarga desde la rama indicada.
+
+Antes de ejecutar los hijos, definir en **Manage Jenkins > System > Global properties > Environment variables** las variables `GIT_REPOSITORY_URL` (URL HTTPS o SSH del repositorio) y `GIT_CREDENTIALS_ID` (ID de la credencial configurada en Jenkins). Los dos Jenkinsfiles secundarios leen esas variables; no contienen URL ni ID de credenciales del repositorio en su código. El repositorio de los propios Jenkinsfiles se configura por SCM en la interfaz de cada trabajo.
 
 Configurar en Jenkins:
 - Plugin **NodeJS** y herramienta `NodeJS22` en Manage Jenkins > Tools.
