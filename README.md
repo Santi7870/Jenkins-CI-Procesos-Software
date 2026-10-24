@@ -1,38 +1,27 @@
 # Pipeline CI - Procesos de Software
 
-Ejercicio de Integración Continua con Jenkins, GitHub privado y Java.
+Proyecto Java con Jenkins, Maven, JUnit, GitHub privado y avisos por Telegram.
 
-## Etapas
+## Tres etapas
 
-1. **Repositorio privado:** Jenkins obtiene el código desde GitHub.
-2. **Compilación y tests:** Maven compila el proyecto y ejecuta 3 pruebas JUnit.
-3. **Notificación:** Jenkins envía el resultado al chat de Telegram configurado.
+1. Repositorio privado: Jenkins obtiene el código desde GitHub.
+2. Compilación y tests: se ejecutan pruebas automatizadas.
+3. Notificación: Telegram informa si el build finalizó correctamente o con errores.
 
-## Archivos
+## Estrategias de optimización
 
-- `src/main/java`: código Java de ejemplo.
-- `src/test/java`: pruebas automáticas.
-- `pom.xml`: dependencias y configuración Maven.
-- `Jenkinsfile`: pipeline declarativo.
+- **Ejecución paralela:** en la rama `main` se ejecutan al mismo tiempo las suites `CalculadoraTest` y `CasosAdicionalesTest`, cada una en su propio directorio.
+- **Caché:** Maven almacena dependencias en `JENKINS_HOME/maven-cache`, reutilizables entre ejecuciones del mismo Jenkins.
+- **Ejecución selectiva:** en `main` se ejecutan ambas suites (5 pruebas). En otras ramas se ejecuta únicamente la suite principal (3 pruebas).
+- **Modularidad:** `scripts/run-tests.ps1` y `scripts/send-telegram.ps1` contienen tareas reutilizables invocadas desde el `Jenkinsfile`.
 
-## Configuración en Jenkins (Windows)
+## Configuración Jenkins para Windows
 
-1. En **Manage Jenkins > Tools**, configurar Maven con nombre exacto `Maven3` y activar instalación automática, si está disponible.
-2. Crear un trabajo **Pipeline** con **Pipeline script from SCM**, Git y la URL de este repositorio.
-3. Seleccionar las credenciales autorizadas de GitHub para clonar el repositorio privado. Usar rama `*/main` y ruta `Jenkinsfile`.
-4. En **Manage Jenkins > Credentials**, añadir dos credenciales de tipo **Secret text**:
-   - `telegram-bot-token`: token del bot de Telegram.
-   - `telegram-chat-id`: identificador del chat destinatario.
-5. Ejecutar **Build Now** y revisar los resultados y el mensaje recibido.
+- Trabajo tipo **Pipeline**, definición **Pipeline script from SCM**, Git, rama `*/main`, ruta `Jenkinsfile`.
+- Instalar Maven desde **Manage Jenkins > Tools** con nombre exacto `Maven3`.
+- Configurar acceso de solo lectura al repositorio privado desde las credenciales del trabajo.
+- Crear dos credenciales **Secret text**: `telegram-bot-token` y `telegram-chat-id`.
+- Ejecutar **Build Now** y revisar **Pipeline Overview**, **Tests** y Telegram.
+- Para probar otra rama, cambiar la rama configurada en el trabajo o utilizar un pipeline multibranch.
 
-**Seguridad:** Nunca subir tokens, contraseñas o identificadores secretos al repositorio.
-
-## Prueba local
-
-Con Java 17+ y Maven instalados:
-
-```powershell
-mvn clean test
-```
-
-El proyecto debería compilar y ejecutar tres tests exitosos.
+El disparador automático por push no está configurado. Las optimizaciones deben validarse mediante una nueva ejecución en Jenkins. No se ha medido una reducción de tiempo.
