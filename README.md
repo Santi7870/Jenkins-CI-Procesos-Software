@@ -1,27 +1,41 @@
-# Pipeline CI - Procesos de Software
+# TaskFlow — Procesos de Software
 
-Proyecto Java con Jenkins, Maven, JUnit, GitHub privado y avisos por Telegram.
+Aplicación web funcional: crear, editar, eliminar y buscar tareas, priorizarlas, cambiar estados y guardar datos en el navegador.
 
-## Tres etapas
+## Ejecutar
 
-1. Repositorio privado: Jenkins obtiene el código desde GitHub.
-2. Compilación y tests: se ejecutan pruebas automatizadas.
-3. Notificación: Telegram informa si el build finalizó correctamente o con errores.
+Node.js 22. Ejecutar `npm install` y `npm run dev`. Abrir la dirección que muestra Vite.
 
-## Estrategias de optimización
+## Pruebas: 24 casos definidos
 
-- **Ejecución paralela:** en la rama `main` se ejecutan al mismo tiempo las suites `CalculadoraTest` y `CasosAdicionalesTest`, cada una en su propio directorio.
-- **Caché:** Maven almacena dependencias en `JENKINS_HOME/maven-cache`, reutilizables entre ejecuciones del mismo Jenkins.
-- **Ejecución selectiva:** en `main` se ejecutan ambas suites (5 pruebas). En otras ramas se ejecuta únicamente la suite principal (3 pruebas).
-- **Modularidad:** `scripts/run-tests.ps1` y `scripts/send-telegram.ps1` contienen tareas reutilizables invocadas desde el `Jenkinsfile`.
+- 12 unitarias: `npm run test:unit`
+- 8 integración: `npm run test:integration`
+- 4 E2E Playwright: `npx playwright install chromium` y `npm run test:e2e`
 
-## Configuración Jenkins para Windows
+## Ramas
 
-- Trabajo tipo **Pipeline**, definición **Pipeline script from SCM**, Git, rama `*/main`, ruta `Jenkinsfile`.
-- Instalar Maven desde **Manage Jenkins > Tools** con nombre exacto `Maven3`.
-- Configurar acceso de solo lectura al repositorio privado desde las credenciales del trabajo.
-- Crear dos credenciales **Secret text**: `telegram-bot-token` y `telegram-chat-id`.
-- Ejecutar **Build Now** y revisar **Pipeline Overview**, **Tests** y Telegram.
-- Para probar otra rama, cambiar la rama configurada en el trabajo o utilizar un pipeline multibranch.
+- `feature/*`: ESLint y unitarias en paralelo.
+- `develop`: añade integración, build y análisis SonarQube.
+- `main`: añade pruebas E2E y archiva `dist/`.
 
-El disparador automático por push no está configurado. Las optimizaciones deben validarse mediante una nueva ejecución en Jenkins. No se ha medido una reducción de tiempo.
+## Optimización
+
+- Paralelo: ESLint y pruebas unitarias independientes.
+- Caché: `npm ci --cache` con caché persistente en Jenkins.
+- Selectivo: etapas activadas según `BRANCH_NAME` mediante `when`.
+- Biblioteca compartida: `vars/ciTasks.groovy`, importada mediante `@Library('taskflow-lib@main')`.
+
+## Jenkins Windows — configuración manual necesaria
+
+Crear **Multibranch Pipeline** GitHub con credenciales del repositorio privado.
+En Manage Jenkins > Tools instalar/configurar NodeJS con nombre **NodeJS22** (plugin NodeJS).
+En Manage Jenkins > System configurar **Global Pipeline Library**, nombre **taskflow-lib**, fuente Git SCM que apunte a este mismo repositorio, versión por defecto **main**, y permitir la versión solicitada.
+Instalar plugin **SonarQube Scanner for Jenkins**; en System registrar servidor **SonarQube-UDLA** con credenciales; en Tools configurar SonarScanner CLI como **SonarScanner**.
+Configurar secretos `telegram-bot-token` y `telegram-chat-id`.
+En el agente Windows instalar navegador E2E: `npx playwright install chromium`.
+SonarQube necesita un servidor accesible desde Jenkins. El Quality Gate aún no está configurado como bloqueo.
+El pipeline archiva la carpeta `dist/` para la entrega; no despliega a hosting externo.
+
+## Medición
+
+Jenkins publica tiempos de ejecución; realizar al menos tres ejecuciones comparables para medir tiempos y observar el efecto de caché. La ejecución de esta nueva versión en Jenkins está pendiente.
