@@ -1,0 +1,33 @@
+@Library('taskflow-lib@main') _
+pipeline {
+  agent any
+  tools { nodejs 'NodeJS22' }
+  options { timestamps(); skipDefaultCheckout(true); disableConcurrentBuilds() }
+  parameters { string(name: 'GIT_REF', defaultValue: 'main', description: 'Rama de la aplicación') }
+  stages {
+    stage('Checkout') {
+      steps {
+        git branch: params.GIT_REF, credentialsId: 'github-jenkins-ci', url: 'https://github.com/Santi7870/Jenkins-CI-Procesos-Software.git'
+      }
+    }
+    stage('Unitarias') {
+      steps { script { ciTasks.run('npm run test:unit', env.JENKINS_HOME + '\\npm-taskflow-cache') } }
+      post { always { junit allowEmptyResults: true, testResults: 'reports/vitest.xml' } }
+    }
+    stage('Integración') {
+      when { expression { params.GIT_REF == 'develop' || params.GIT_REF == 'main' } }
+      steps { script { ciTasks.run('npm run test:integration', env.JENKINS_HOME + '\\npm-taskflow-cache') } }
+      post { always { junit allowEmptyResults: true, testResults: 'reports/vitest.xml' } }
+    }
+    stage('E2E') {
+      when { expression { params.GIT_REF == 'main' } }
+      steps { bat 'npx playwright test' }
+      post { always { junit allowEmptyResults: true, testResults: 'reports/playwright.xml' } }
+    }
+  }
+  post {
+    always { script { echo 'Duración pruebas: ' + currentBuild.durationString } }
+    success { echo 'Pruebas correctas' }
+    failure { echo 'Pruebas fallidas' }
+  }
+}
