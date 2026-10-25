@@ -1,7 +1,34 @@
-import {test,expect} from '@playwright/test';
-test.beforeEach(async({page})=>{await page.goto('/');await page.evaluate(()=>localStorage.clear());await page.reload()});
-test('crea una tarea',async({page})=>{await page.getByLabel('Nueva tarea').fill('Informe CI');await page.getByRole('button',{name:'Agregar'}).click();await expect(page.getByText('Informe CI')).toBeVisible()});
-test('completa una tarea',async({page})=>{await page.getByLabel('Nueva tarea').fill('Pruebas');await page.getByRole('button',{name:'Agregar'}).click();await page.getByLabel('Estado de Pruebas').selectOption('completada');await expect(page.locator('#metrics')).toContainText('Completadas: 1')});
-test('filtra tareas',async({page})=>{await page.getByLabel('Nueva tarea').fill('Diseño');await page.getByRole('button',{name:'Agregar'}).click();await page.getByLabel('Buscar tareas').fill('no coincide');await expect(page.getByText('Sin resultados')).toBeVisible()});
-test('elimina tarea',async({page})=>{await page.getByLabel('Nueva tarea').fill('Quitar');await page.getByRole('button',{name:'Agregar'}).click();await page.getByRole('button',{name:'Eliminar'}).click();await expect(page.getByText('Quitar')).toHaveCount(0)});
+import { expect, test } from '@playwright/test';
+
+test.beforeEach(async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+});
+
+test('crea una tarea', async ({ page }) => {
+  await page.getByLabel('Nueva tarea').fill('Informe CI');
+  await page.getByRole('button', { name: 'Agregar' }).click();
+  await expect(page.getByText('Informe CI')).toBeVisible();
+});
+
+test('completa una tarea', async ({ page }) => {
+  await page.getByLabel('Nueva tarea').fill('Pruebas');
+  await page.getByRole('button', { name: 'Agregar' }).click();
+  await page.getByLabel('Estado de Pruebas').selectOption('completada');
+  await expect(page.locator('#metrics')).toContainText('Completadas: 1');
+});
+
+test('filtra tareas', async ({ page }) => {
+  await page.getByLabel('Nueva tarea').fill('Diseño');
+  await page.getByRole('button', { name: 'Agregar' }).click();
+  await page.getByLabel('Buscar tareas').fill('no coincide');
+  await expect(page.getByText('Sin resultados')).toBeVisible();
+});
+
+test('elimina tarea', async ({ page }) => {
+  await page.getByLabel('Nueva tarea').fill('Quitar');
+  await page.getByRole('button', { name: 'Agregar' }).click();
+  await page.getByRole('button', { name: 'Eliminar' }).click();
+  await expect(page.getByText('Quitar')).toHaveCount(0);
 });
