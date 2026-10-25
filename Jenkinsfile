@@ -27,7 +27,7 @@ pipeline {
   }
   post {
     always { script { echo 'Duración: ' + currentBuild.durationString + ' | Estado: ' + currentBuild.currentResult } }
-    success { node { script { ciTasks.notifyTelegram('SUCCESS') } } }
-    failure { node { script { ciTasks.notifyTelegram('FAILURE') } } }
+    success { node('') { script { ciTasks.notifyTelegram('SUCCESS') } } }
+    failure { node('') { script { ciTasks.notifyTelegram('FAILURE') } } }
   }
 }
