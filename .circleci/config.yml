@@ -1,0 +1,158 @@
+# TaskFlow - Migracion Jenkins -> CircleCI
+# Proyecto de Procesos de Software, UDLA
+version: 2.1
+
+executors:
+  node22:
+    docker:
+      - image: cimg/node:22
+    working_directory: ~/taskflow
+    resource_class: medium
+
+commands:
+  preparar_dependencias:
+    description: "Checkout y cache npm reutilizable entre ejecuciones"
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - npm-v2-{{ checksum "package.json" }}
+      - run:
+          name: Instalar dependencias
+          command: npm install --prefer-offline --no-audit --no-fund
+      - save_cache:
+          key: npm-v2-{{ checksum "package.json" }}
+          paths:
+            - ~/.npm
+
+  notificar_telegram:
+    description: "Notificaciones de exito y fallo por job; credenciales privadas en CircleCI"
+    steps:
+      - run:
+          name: Telegram - SUCCESS
+          when: on_success
+          command: |
+            if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT_ID" ]; then
+              curl --fail --silent --show-error --max-time 20 \
+                --data-urlencode "chat_id=$TG_CHAT_ID" \
+                --data-urlencode "text=TaskFlow CircleCI - SUCCESS | $CIRCLE_JOB #$CIRCLE_BUILD_NUM | rama: $CIRCLE_BRANCH" \
+                "https://api.telegram.org/bot$TG_TOKEN/sendMessage" >/dev/null || echo "Aviso Telegram no entregado"
+            else
+              echo "Telegram no configurado: definir TG_TOKEN y TG_CHAT_ID en CircleCI"
+            fi
+      - run:
+          name: Telegram - FAILURE
+          when: on_fail
+          command: |
+            if [ -n "$TG_TOKEN" ] && [ -n "$TG_CHAT_ID" ]; then
+              curl --fail --silent --show-error --max-time 20 \
+                --data-urlencode "chat_id=$TG_CHAT_ID" \
+                --data-urlencode "text=TaskFlow CircleCI - FAILURE | $CIRCLE_JOB #$CIRCLE_BUILD_NUM | rama: $CIRCLE_BRANCH" \
+                "https://api.telegram.org/bot$TG_TOKEN/sendMessage" >/dev/null || echo "Aviso Telegram no entregado"
+            else
+              echo "Telegram no configurado: definir TG_TOKEN y TG_CHAT_ID en CircleCI"
+            fi
+
+jobs:
+  unitarias:
+    executor: node22
+    steps:
+      - preparar_dependencias
+      - run:
+          name: Vitest - 12 pruebas unitarias
+          command: npm run test:unit
+      - store_test_results:
+          path: reports
+      - notificar_telegram
+
+  integracion:
+    executor: node22
+    steps:
+      - preparar_dependencias
+      - run:
+          name: Vitest - 8 pruebas de integracion
+          command: npm run test:integration
+      - store_test_results:
+          path: reports
+      - notificar_telegram
+
+  e2e:
+    executor: node22
+    steps:
+      - preparar_dependencias
+      - run:
+          name: Instalar navegador y librerias para Playwright
+          command: npx playwright install --with-deps chromium
+      - run:
+          name: Playwright - 4 pruebas E2E
+          command: npm run test:e2e
+      - store_test_results:
+          path: reports
+      - store_artifacts:
+          path: test-results
+          destination: playwright-test-results
+      - notificar_telegram
+
+  lint:
+    executor: node22
+    steps:
+      - preparar_dependencias
+      - run:
+          name: ESLint - analizar codigo
+          command: npm run lint
+      - notificar_telegram
+
+  build_y_sonar:
+    executor: node22
+    steps:
+      - preparar_dependencias
+      - run:
+          name: Build con Vite
+          command: npm run build
+      - run:
+          name: Cobertura unitaria e integracion
+          command: npm run test:coverage
+      - run:
+          name: Analisis con SonarQube Cloud
+          command: |
+            if [ -z "$SONAR_TOKEN" ]; then
+              echo "Falta SONAR_TOKEN en las variables de entorno de CircleCI"
+              exit 1
+            fi
+            npx --yes @sonar/scan@5.0.2 -Dsonar.host.url=https://sonarcloud.io
+      - store_test_results:
+          path: reports
+      - store_artifacts:
+          path: dist
+          destination: taskflow-build
+      - store_artifacts:
+          path: coverage
+          destination: cobertura
+      - notificar_telegram
+
+# Los jobs del mismo workflow sin "requires" se pueden ejecutar en paralelo.
+# La rama de GitHub es la que determina el conjunto de jobs a ejecutar.
+workflows:
+  validacion_rapida:
+    jobs:
+      - unitarias
+      - lint
+
+  validacion_extendida:
+    jobs:
+      - integracion:
+          filters:
+            branches:
+              only:
+                - main
+                - develop
+      - build_y_sonar:
+          filters:
+            branches:
+              only:
+                - main
+                - develop
+      - e2e:
+          filters:
+            branches:
+              only: main
